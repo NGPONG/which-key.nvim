@@ -63,6 +63,8 @@ local defaults = {
   hidden = { "<silent>", "<cmd>", "<Cmd>", "<CR>", "^:", "^ ", "^call ", "^lua " }, -- hide mapping boilerplate
   show_help = true, -- show a help message in the command line for using WhichKey
   show_keys = true, -- show the currently pressed key and its label as a message in the command line
+  sort_by_description = false,
+  auto_feedkeys = false,
   triggers = "auto", -- automatically setup triggers
   -- triggers = {"<leader>"} -- or specifiy a list manually
   -- list of triggers, where WhichKey should not wait for timeoutlen and show immediately
