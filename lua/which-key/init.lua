@@ -71,7 +71,7 @@ function M.register(mappings, opts)
   schedule_load()
   if loaded then
     Keys.register(mappings, opts)
-    Keys.update()
+    Keys.update(opts and opts.buffer or nil)
   else
     table.insert(queue, { mappings, opts })
   end

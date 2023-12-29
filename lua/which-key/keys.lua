@@ -151,11 +151,6 @@ function M.get_mappings(mode, prefix_i, buf)
   add(M.get_tree(mode).tree:get(prefix_i, nil, plugin_context), false)
   add(M.get_tree(mode, buf).tree:get(prefix_i, nil, plugin_context), true)
 
-  -- TODO: wait for deleted
-  -- require('log').info(M.get_tree(mode, buf).tree.root)
-  -- require('log').info(M.get_tree(mode).tree.root)
-  -- require('log').info(M.get_tree(mode, buf).tree:get(prefix_i, nil, plugin_context))
-
   -- Handle motions
   M.process_motions(ret, mode, prefix_i, buf)
 
@@ -259,7 +254,7 @@ function M.register(mappings, opts)
     if mapping.cmd ~= nil then
       M.map(mapping.mode, mapping.prefix, mapping.cmd, mapping.buf, mapping.opts)
     end
-    M.get_tree(mapping.mode, mapping.buf).tree:add(mapping)
+    M.get_tree(mapping.mode, mapping.buf).tree:add(mapping, { manual_reg = true })
   end
 end
 
@@ -365,14 +360,21 @@ function M.update(buf)
     if tree.buf and not vim.api.nvim_buf_is_valid(tree.buf) then
       -- remove group for invalid buffers
       M.mappings[k] = nil
-    elseif not buf or not tree.buf or buf == tree.buf then
-      -- only update buffer maps, if:
-      -- 1. we dont pass a buffer
-      -- 2. this is a global node
-      -- 3. this is a local buffer node for the passed buffer
-      M.update_keymaps(tree.mode, tree.buf)
-      M.add_hooks(tree.mode, tree.buf, tree.tree.root)
+      goto continue
     end
+
+    if buf and tree.buf ~= buf then
+      goto continue
+    end
+
+    -- only update buffer maps, if:
+    -- 1. we dont pass a buffer
+    -- 2. this is a global node
+    -- 3. this is a local buffer node for the passed buffer
+    M.update_keymaps(tree.mode, tree.buf)
+    M.add_hooks(tree.mode, tree.buf, tree.tree.root)
+
+    ::continue::
   end
 end
 
@@ -444,6 +446,23 @@ function M.update_keymaps(mode, buf)
   ---@type Keymap[]
   local keymaps = buf and vim.api.nvim_buf_get_keymap(buf, mode) or vim.api.nvim_get_keymap(mode)
   local tree = M.get_tree(mode, buf).tree
+
+  -- buffer local 类型的 keymaps 变化比较频繁，所以每次更新
+  -- 键的时候都要清理掉一些不是手动设置的 keys
+  if buf then
+    local function __f(parent)
+      for _key, _node in pairs(parent) do
+        __f(_node.children or {})
+
+        if not _node.manual_reg and not next(_node.children) then
+          parent[_key] = nil
+        end
+      end
+    end
+
+    __f(tree.nodes)
+    __f(tree.root.children)
+  end
 
   local function is_nop(keymap)
     return not keymap.callback and (keymap.rhs == "" or keymap.rhs:lower() == "<nop>")

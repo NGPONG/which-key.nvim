@@ -90,6 +90,8 @@ function Tree:add(mapping, opts)
     if opts.cache then
       self.nodes[node_key] = node
     end
+
+    node.manual_reg = opts.manual_reg and opts.manual_reg or false
   end
   node.mapping = vim.tbl_deep_extend("force", node.mapping or {}, mapping)
   return node
