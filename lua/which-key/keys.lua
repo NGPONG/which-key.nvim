@@ -162,9 +162,6 @@ function M.get_mappings(mode, prefix_i, buf)
       value.key = Config.options.key_labels[value.key]
     end
     local skip = not value.label and Config.options.ignore_missing == true
-    if Util.t(value.key) == Util.t("<esc>") then
-      skip = true
-    end
     if not skip then
       if value.group then
         value.label = value.label or "+prefix"
