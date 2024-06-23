@@ -66,7 +66,7 @@ local defaults = {
   sort_by_description = false,
   auto_feedkeys = false,
   triggers = "auto", -- automatically setup triggers
-  -- triggers = {"<leader>"} -- or specifiy a list manually
+  -- triggers = {"<leader>"} -- or specify a list manually
   -- list of triggers, where WhichKey should not wait for timeoutlen and show immediately
   triggers_nowait = {
     -- marks
@@ -87,7 +87,7 @@ local defaults = {
     v = { "j", "k" },
   },
   -- disable the WhichKey popup for certain buf types and file types.
-  -- Disabled by deafult for Telescope
+  -- Disabled by default for Telescope
   disable = {
     buftypes = {},
     filetypes = {},
@@ -99,6 +99,9 @@ M.options = {}
 
 ---@param options? Options
 function M.setup(options)
+  if vim.fn.has("nvim-0.9") == 0 then
+    return vim.notify("WhichKey.nvim requires Neovim 0.9 or higher", vim.log.levels.ERROR)
+  end
   M.options = vim.tbl_deep_extend("force", {}, defaults, options or {})
 end
 

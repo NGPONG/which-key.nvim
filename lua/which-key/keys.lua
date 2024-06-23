@@ -8,10 +8,9 @@ local secret = "Þ"
 ---@class Keys
 local M = {}
 
-M.functions = {}
-M.operators = {}
-M.nowait = {}
-M.blacklist = {}
+M.operators = {} ---@type table<string, boolean>
+M.nowait = {} ---@type table<string, boolean>
+M.blacklist = {} ---@type table<string, table<string, boolean>>
 
 function M.setup()
   local builtin_ops = require("which-key.plugins.presets").operators
@@ -39,12 +38,14 @@ function M.setup()
 end
 
 function M.get_operator(prefix_i)
+  local ret = { i = nil, n = nil, len = nil }
   for op_n, _ in pairs(Config.options.operators) do
     local op_i = Util.t(op_n)
-    if prefix_i:sub(1, #op_i) == op_i then
-      return op_i, op_n
+    if prefix_i:sub(1, #op_i) == op_i and (ret.len == nil or #op_i > ret.len) then
+      ret = { i = op_i, n = op_n, len = #op_i }
     end
   end
+  return ret.i, ret.n
 end
 
 function M.process_motions(ret, mode, prefix_i, buf)
@@ -135,11 +136,10 @@ function M.get_mappings(mode, prefix_i, buf)
           end
         end
 
-        if child.mapping.label ~= "which_key_ignore" and
-           child.mapping.desc ~= "which_key_ignore" and
-           not (child.mapping.group and vim.tbl_isempty(child.children))
+        if child.mapping.desc ~= "which_key_ignore" and not (child.mapping.group and vim.tbl_isempty(child.children))
         then
-          ret.mappings[k] = vim.tbl_deep_extend("force", {}, ret.mappings[k] or {}, child.mapping)
+          local child_mapping = vim.deepcopy(child.mapping)
+          ret.mappings[k] = vim.tbl_deep_extend("force", ret.mappings[k] or {}, child_mapping)
         end
 
           ::continue::
@@ -161,16 +161,16 @@ function M.get_mappings(mode, prefix_i, buf)
     if Config.options.key_labels[value.key] then
       value.key = Config.options.key_labels[value.key]
     end
-    local skip = not value.label and Config.options.ignore_missing == true
+    local skip = not value.desc and Config.options.ignore_missing == true
     if not skip then
       if value.group then
-        value.label = value.label or "+prefix"
-        value.label = value.label:gsub("^%+", "")
-        value.label = Config.options.icons.group .. value.label
-      elseif not value.label then
-        value.label = value.desc or value.cmd or ""
+        value.desc = value.desc or "+prefix"
+        value.desc = value.desc:gsub("^%+", "")
+        value.desc = Config.options.icons.group .. value.desc
+      elseif not value.desc then
+        value.desc = value.cmd or ""
         for _, v in ipairs(Config.options.hidden) do
-          value.label = value.label:gsub(v, "")
+          value.desc = value.desc:gsub(v, "")
         end
       end
       if value.value then
@@ -381,7 +381,7 @@ function M.add_hooks(mode, buf, node, secret_only)
     node.mapping = { prefix = node.prefix_n, group = true, keys = Util.parse_keys(node.prefix_n) }
   end
   if node.prefix_n ~= "" and node.mapping.group == true and not (node.mapping.cmd or node.mapping.callback) then
-    -- first non-cmd level, so create hook and make all decendents secret only
+    -- first non-cmd level, so create hook and make all descendents secret only
     M.hook_add(node.prefix_n, mode, buf, secret_only)
     secret_only = true
   end
@@ -399,7 +399,7 @@ function M.dump()
       ---@param node Node
       function(node)
         if node.mapping then
-          if node.mapping.label then
+          if node.mapping.desc then
             ok[node.mapping.prefix] = true
             todo[node.mapping.prefix] = nil
           elseif not ok[node.mapping.prefix] then
@@ -413,7 +413,7 @@ function M.dump()
 end
 
 ---@param mode string
----@param buf? buffer
+---@param buf? number
 function M.get_tree(mode, buf)
   if mode == "s" or mode == "x" then
     mode = "v"
@@ -467,24 +467,34 @@ function M.update_keymaps(mode, buf)
 
   for _, keymap in pairs(keymaps) do
     local skip = M.is_hook(keymap.lhs, keymap.rhs)
+    local is_group = false
 
-    if is_nop(keymap) then
-      skip = true
+    if not skip and is_nop(keymap) then
+      if keymap.desc then
+        pcall(vim.keymap.del, { mode }, keymap.lhs, { buffer = buf })
+        is_group = true
+      else
+        skip = true
+      end
     end
 
     if not skip then
+      ---@type Mapping
       local mapping = {
         prefix = keymap.lhs,
-        cmd = keymap.rhs,
+        cmd = not is_group and keymap.rhs or nil,
         desc = keymap.desc,
+        group = is_group,
         callback = keymap.callback,
         keys = Util.parse_keys(keymap.lhs),
+        buf = buf,
+        mode = mode,
       }
       -- don't include Plug keymaps
       if mapping.keys.notation[1]:lower() ~= "<plug>" then
         local node = tree:add(mapping)
         if node.mapping and node.mapping.preset and mapping.desc then
-          node.mapping.label = mapping.desc
+          node.mapping.desc = mapping.desc
         end
       end
     end

@@ -134,7 +134,7 @@ function M._parse(value, mappings, opts)
     if type(list[1]) ~= "string" then
       error("Invalid mapping for " .. vim.inspect({ value = value, opts = opts }))
     end
-    opts.desc = list[1]
+    opts.desc = opts.desc or list[1]
   -- { cmd, desc }
   elseif #list == 2 then
     -- desc
@@ -179,7 +179,8 @@ function M.to_mapping(mapping)
   mapping.buffer = nil
 
   mapping.mode = mapping.mode or "n"
-  mapping.label = mapping.desc or mapping.name
+  mapping.desc = mapping.desc or mapping.name
+  mapping.name = nil
   mapping.keys = Util.parse_keys(mapping.prefix or "")
 
   local opts = {}
@@ -187,25 +188,8 @@ function M.to_mapping(mapping)
     opts[o] = mapping[o]
     mapping[o] = nil
   end
-
-  if vim.fn.has("nvim-0.7.0") == 0 then
-    opts.replace_keycodes = nil
-
-    -- Neovim < 0.7.0 doesn't support descriptions
-    opts.desc = nil
-
-    -- use lua functions proxy for Neovim < 0.7.0
-    if opts.callback then
-      local functions = require("which-key.keys").functions
-      table.insert(functions, opts.callback)
-      if opts.expr then
-        opts.cmd = string.format([[luaeval('require("which-key").execute(%d)')]], #functions)
-      else
-        opts.cmd = string.format([[<cmd>lua require("which-key").execute(%d)<cr>]], #functions)
-      end
-      opts.callback = nil
-    end
-  end
+  -- restore desc
+  mapping.desc = opts.desc
 
   mapping.opts = opts
   return mapping
