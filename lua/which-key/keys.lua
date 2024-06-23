@@ -163,6 +163,9 @@ function M.get_mappings(mode, prefix_i, buf)
     end
     local skip = not value.desc and Config.options.ignore_missing == true
     if not skip then
+      if value.group == nil then
+        value.group = false
+      end
       if value.group then
         value.desc = value.desc or "+prefix"
         value.desc = value.desc:gsub("^%+", "")
